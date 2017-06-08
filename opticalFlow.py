@@ -1,59 +1,44 @@
 import cv2
 import numpy as np
 
-video = cv2.VideoCapture('campus4-c0.avi')
+video = cv2.VideoCapture('/home/someoddperson/Projects/movementRecognition/campus4-c0.avi')
+ret, frame = video.read()
 
-min_dist = 0.8
-feature_params = {
-    'maxCorners': 1000,
-    'qualityLevel': 0.1,
-    'minDistance': 20,
-    'blockSize': 7,
-}
+prvs = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+mask = np.zeros_like(frame)
 
-lk_params = {
-    'winSize': (15, 15),
-    'maxLevel': 2,
-    'criteria': (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03)
-}
-
-color = np.random.randint(0, 255, (100, 3))
-
-ret, old_frame = video.read()
-old_gray = cv2.cvtColor(old_frame, cv2.COLOR_BGR2GRAY)
-p0 = cv2.goodFeaturesToTrack(old_gray, **feature_params)
-
-mask = np.zeros_like(old_frame)
+minSize = 40
 
 while video.isOpened():
     ret, frame = video.read()
-    frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    nxt = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-    p1, st, err = cv2.calcOpticalFlowPyrLK(old_gray, frame_gray, p0, None, **lk_params)
+    flow = cv2.calcOpticalFlowFarneback(prvs, nxt, None, 0.5, 3, 15, 3, 5, 1.2, 0)
 
-    good_new = p1[st == 1]
-    good_old = p0[st == 1]
+    pts, _ = cv2.cartToPolar(flow[..., 0], flow[..., 1])
+    pts *= 100
+    mask[..., 0] = pts
+    mask[..., 1] = pts
+    mask[..., 2] = pts
+    mask_gray = cv2.cvtColor(mask, cv2.COLOR_RGB2GRAY)
+    _, mask_gray = cv2.threshold(mask_gray, 130, 255, cv2.THRESH_BINARY)
+    mask_gray = cv2.medianBlur(mask_gray, 5)
+    mask_gray = cv2.GaussianBlur(mask_gray, (31, 31), 0)
 
-    for i, (new, old) in enumerate(zip(good_new, good_old)):
-        a, b = new.ravel()
-        c, d = old.ravel()
-        dist = cv2.norm(new - old)
-        # mask = cv2.line(mask, (a, b), (c, d), color[i].tolist(), 2)
-        # if(dist > min_dist):
-        mask = cv2.circle(mask, (a, b), 5, color[i].tolist(), -1)
+    _, contours, _ = cv2.findContours(mask_gray, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
 
-    img = cv2.add(frame, mask)
+    for c in contours:
+        x, y, w, h = cv2.boundingRect(c)
+        if w > minSize and h > minSize:
+            cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
 
-    cv2.imshow('mask', mask)
-    cv2.imshow('frame', img)
-
-    action = cv2.waitKey(30) & 0xFF
+    cv2.imshow('mask', mask_gray)
+    cv2.imshow('frame', frame)
+    action = cv2.waitKey(1) & 0xFF
     if action == 27:
         break
 
-    old_gray = frame_gray.copy()
-    p0 = good_new.reshape(-1, 1, 2)
-    mask = np.zeros_like(old_frame)
+    prvs = nxt
 
 video.release()
 cv2.destroyAllWindows()
