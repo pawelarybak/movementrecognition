@@ -39,8 +39,8 @@ while video.isOpened():
         c, d = old.ravel()
         dist = cv2.norm(new - old)
         # mask = cv2.line(mask, (a, b), (c, d), color[i].tolist(), 2)
-        if(dist > min_dist):
-            mask = cv2.circle(mask, (a, b), 5, color[i].tolist(), -1)
+        # if(dist > min_dist):
+        mask = cv2.circle(mask, (a, b), 5, color[i].tolist(), -1)
 
     img = cv2.add(frame, mask)
 
